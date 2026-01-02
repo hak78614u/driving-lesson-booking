@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Driving Lesson Booking – Admin System</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; background:#f2f2f2; padding:20px; }
+    .container { max-width:800px; margin:auto; background:#fff; padding:20px; border-radius:10px; }
+    h2, h3 { text-align:center; }
+    label { display:block; margin-top:10px; }
+    input, select, textarea, button { width:100%; padding:10px; margin-top:5px; }
+    button { background:#1e88e5; color:#fff; border:none; margin-top:10px; border-radius:5px; cursor:pointer; }
+    .booking { background:#f9f9f9; padding:12px; margin-top:10px; border-radius:6px; border:1px solid #ddd; }
+    .admin { background:#e3f2fd; padding:15px; margin-top:20px; border-radius:8px; }
+    .status { font-weight:bold; }
+    .btn-small { width:auto; margin-right:5px; padding:6px 10px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>🚗 Driving Lesson Booking</h2>
+
+  <!-- STUDENT BOOKING -->
+  <form id="bookingForm">
+    <label>Student Name</label><input id="name" required>
+    <label>Phone / WhatsApp</label><input id="phone" required>
+    <label>Email</label><input id="email">
+
+    <label>Lesson Type</label>
+    <select id="lesson" required>
+      <option>Beginner</option><option>Manual</option><option>Automatic</option><option>Test Prep</option>
+    </select>
+
+    <label>Duration</label>
+    <select id="duration"><option>1 Hour (£30)</option><option>2 Hours (£55)</option></select>
+
+    <label>Date</label><input type="date" id="date" required>
+    <label>Time</label><input type="time" id="time" required>
+
+    <label>Pickup Address</label>
+    <textarea id="address" placeholder="Street, Postcode" required></textarea>
+
+    <button type="submit">Book Lesson</button>
+  </form>
+
+  <!-- ADMIN LOGIN -->
+  <div class="admin">
+    <h3>🔐 Instructor Login</h3>
+    <input type="password" id="adminPass" placeholder="Admin password">
+    <button onclick="login()">Login</button>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div id="adminPanel" style="display:none" class="admin">
+    <h3>📅 Daily Schedule</h3>
+    <button onclick="exportCSV()">📤 Export CSV</button>
+    <div id="bookings"></div>
+  </div>
+</div>
+
+<script>
+  // FIREBASE CONFIG
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+    projectId: "YOUR_PROJECT",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "XXXX",
+    appId: "XXXX"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const ref = db.ref('drivingBookings');
+
+  // BOOKING
+  bookingForm.onsubmit = e => {
+    e.preventDefault();
+    ref.push({
+      name:name.value, phone:phone.value, email:email.value,
+      lesson:lesson.value, duration:duration.value,
+      date:date.value, time:time.value, address:address.value,
+      status:'Pending'
+    });
+    bookingForm.reset();
+  };
+
+  // ADMIN LOGIN (simple)
+  function login(){
+    if(adminPass.value==='1234'){
+      adminPanel.style.display='block';
+    } else alert('Wrong password');
+  }
+
+  // LOAD BOOKINGS
+  ref.on('value', snap => {
+    bookings.innerHTML='';
+    snap.forEach(c => {
+      const b=c.val();
+      const d=document.createElement('div');
+      d.className='booking';
+      d.innerHTML=`
+        <b>${b.name}</b> (${b.phone})<br>
+        ${b.lesson} - ${b.duration}<br>
+        ${b.date} ${b.time}<br>
+        <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}" target="_blank">📍 Map</a><br>
+        <span class='status'>${b.status}</span><br>
+        <button class='btn-small' onclick="updateStatus('${c.key}','Accepted')">Accept</button>
+        <button class='btn-small' onclick="updateStatus('${c.key}','Rejected')">Reject</button>
+      `;
+      bookings.appendChild(d);
+    });
+  });
+
+  function updateStatus(id,status){
+    ref.child(id).update({status});
+    // WhatsApp/SMS hook (Twilio / WhatsApp API)
+    // window.open(`https://wa.me/?text=Your lesson is ${status}`)
+  }
+
+  // CSV EXPORT
+  function exportCSV(){
+    ref.once('value', snap=>{
+      let csv='Name,Phone,Lesson,Date,Time,Status\n';
+      snap.forEach(c=>{
+        const b=c.val();
+        csv+=`${b.name},${b.phone},${b.lesson},${b.date},${b.time},${b.status}\n`;
+      });
+      const a=document.createElement('a');
+      a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+      a.download='bookings.csv'; a.click();
+    });
+  }
+</script>
+
+</body>
+</html>
